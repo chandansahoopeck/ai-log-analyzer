@@ -12,7 +12,7 @@ except KeyError:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Use the model you want (update if gemini-2.0-flash-001 becomes available)
-MODEL_NAME = "gemini-1.5-flash"  # Replace with "gemini-2.0-flash-001" when available
+MODEL_NAME = "gemini-2.0-flash-001"  
 
 st.set_page_config(page_title="AI Log Analyzer", layout="wide")
 st.title("🔍 AI Log Analyzer with Gemini")
