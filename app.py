@@ -1,6 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 
 # Configure Gemini using Streamlit Secrets
 try:
@@ -11,13 +10,14 @@ except KeyError:
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-MODEL_NAME = "gemini-2.0-flash-001"  
+# Use gemini-1.5-flash for now; update when gemini-2.0-flash-001 is available
+MODEL_NAME = "gemini-2.0-flash-001"
 
 st.set_page_config(page_title="AI Log Analyzer", layout="wide")
 st.title("🔍 AI Log Analyzer with Gemini")
 st.caption(f"Powered by **{MODEL_NAME}**")
 
-# Input method selection
+# Input method
 input_type = st.radio("Input Method", ["Upload Log File", "Paste Log Text"], horizontal=True)
 
 log_content = ""
@@ -37,13 +37,12 @@ else:
         placeholder="Example:\nJan 01 12:00:00 server ERROR: Connection timeout\nJan 01 12:01:00 server INFO: Retrying..."
     )
 
-# Truncate very long logs to avoid performance issues (Gemini can handle long context, but UI may lag)
+# Truncate long logs
 MAX_CHARS = 50000
 if len(log_content) > MAX_CHARS:
     log_content = log_content[:MAX_CHARS]
     st.warning(f"⚠️ Log truncated to {MAX_CHARS:,} characters for responsiveness.")
 
-# Show preview if content exists
 if log_content.strip():
     with st.expander("📋 Log Preview (first 1,000 characters)"):
         st.code(log_content[:1000], language="text")
@@ -58,6 +57,29 @@ if log_content.strip():
             try:
                 model = genai.GenerativeModel(MODEL_NAME)
                 
-                # Use triple SINGLE quotes to avoid SyntaxError with f-strings
-                prompt = f'''You are a senior DevOps/SRE engineer analyzing system logs.
-Log content:
+                # SAFE PROMPT: No triple quotes → no SyntaxError
+                prompt = (
+                    "You are a senior DevOps/SRE engineer analyzing system logs.\n"
+                    "Log content:\n"
+                    "```\n"
+                    + log_content + "\n"
+                    "```\n\n"
+                    "Question: " + user_question + "\n\n"
+                    "Instructions:\n"
+                    "- Be concise, technical, and accurate.\n"
+                    "- Reference specific lines or patterns if they exist.\n"
+                    "- If the log does not contain enough information to answer, say so clearly.\n"
+                    "- Do not make up facts."
+                )
+
+                response = model.generate_content(prompt)
+                
+                if not response.text:
+                    st.warning("⚠️ Gemini returned an empty response. The content may have been blocked.")
+                else:
+                    st.subheader("🤖 AI Analysis")
+                    st.write(response.text)
+
+            except Exception as e:
+                st.error(f"❌ Error calling Gemini API: {str(e)}")
+                st.info("💡 Make sure:\n- Your API key is valid\n- The model name is correct\n- You have quota remaining")
