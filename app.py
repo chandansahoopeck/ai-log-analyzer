@@ -49,5 +49,5 @@ if log_content.strip():
         with st.spinner("🧠 Analyzing with Gemini..."):
             try:
                 model = genai.GenerativeModel(MODEL_NAME)
-                prompt = f"""You are a senior DevOps/SRE engineer.
-Log data:
+                prompt = f'''You are a senior DevOps/SRE engineer.
+Log content:
