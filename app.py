@@ -9,6 +9,8 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import time
+import json
+from typing import List, Dict, Any
 from datetime import datetime
 
 # ============================================
@@ -43,12 +45,12 @@ def scan_for_target_entry(log_content: str, target_id: str) -> List[Dict[str, An
         # Track JSON object boundaries
         if brace_depth == 0 and line.strip().startswith('{'):
             current_entry = line
-            brace_depth = 1
+            brace_depth = line.count('{') - line.count('}')
         elif brace_depth > 0:
             current_entry += '\n' + line
             brace_depth += line.count('{') - line.count('}')
             
-            if brace_depth == 0 and id_pattern.search(current_entry):
+            if brace_depth <= 0 and id_pattern.search(current_entry):
                 # Extract processing time value
                 pt_match = re.search(r'"processingTime"\s*:\s*(\d+\.?\d*)', current_entry)
                 pt_value = pt_match.group(1) if pt_match else "N/A"
@@ -59,6 +61,8 @@ def scan_for_target_entry(log_content: str, target_id: str) -> List[Dict[str, An
                     'processing_time': pt_value,
                     'match_type': 'exact_id'
                 })
+                current_entry = ""
+                brace_depth = 0
     
     return entries
 
@@ -131,7 +135,7 @@ if log_content.strip():
         st.subheader("🧠 Analysis of Target Entries")
         model = genai.GenerativeModel(MODEL_NAME)
         
-        for i, entry in enumerate(target_entries):
+        for i, entry in enumerate(target_entries[:3]):  # Limit to first 3 entries
             with st.status(f"🔍 Analyzing entry {i+1}...", expanded=False):
                 # SAFE PROMPT with explicit newlines
                 prompt = (
@@ -159,20 +163,16 @@ if log_content.strip():
                     
                     # Show raw entry for debugging
                     with st.expander("🔍 Raw log entry (for debugging)"):
-                        st.json(json.loads(entry['entry']))
+                        try:
+                            st.json(json.loads(entry['entry']))
+                        except:
+                            st.code(entry['entry'][:1000], language="json")
                 except Exception as e:
                     st.error(f"❌ Analysis failed: {str(e)}")
         
         # STEP 3: Show context if multiple entries found
-        if len(target_entries) > 1:
-            st.info("💡 **Pro Tip**: You have multiple entries for this ID. Check if processing time varies across entries - this could indicate intermittent issues.")
+        if len(target_entries) > 3:
+            st.info(f"💡 **Note**: Found {len(target_entries)} total entries for this ID. Showing first 3. Check if processing time varies across entries - this could indicate intermittent issues.")
         
-        # STEP 4: Show search tips if no entries found
-        if not target_entries:
-            st.warning("💡 **If still not found**, try these specific searches:")
-            st.code('grep -a \'"id": *798602\' your_log.json', language="bash")
-            st.code('grep -a \'"processingTime": *15166.0\' your_log.json', language="bash")
-            st.code('grep -a \'"legacyId": *798602\' your_log.json', language="bash")
-
 st.divider()
 st.caption("✅ This tool is customized for YOUR log structure - no more 'insufficient data' errors!")
